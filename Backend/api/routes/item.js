@@ -1,21 +1,13 @@
 import express from 'express';
-
-import {
-  createItem,
-  getAllItems,
-  getItemById,
-  updateItemById,
-  deleteItemById,
-} from '../controllers/itemController.js';
-import upload from '../Middleware/multerMiddleware.js';
+import { createItem, getAllItems } from '../controllers/itemController.js';
+import upload from '../Middleware/multermiddleware.js';
 
 const router = express.Router();
 
-// Routes for CRUD operations
-router.post('/',upload.single('image'), createItem);
+// POST: create a new item with image
+router.post('/', upload.single('image'), createItem);
+
+// GET: get all items
 router.get('/', getAllItems);
-router.get('/:id', getItemById);
-router.put('/:id', updateItemById);
-router.delete('/:id', deleteItemById);
 
 export default router;

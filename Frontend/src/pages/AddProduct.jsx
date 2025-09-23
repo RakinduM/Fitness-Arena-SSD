@@ -4,75 +4,85 @@ import axios from "axios";
 const AddProduct = () => {
   const [formData, setFormData] = useState({
     name: "",
-    category: "", // Update category field
+    category: "",
     price: "",
     image: null,
   });
 
+  const [errorMsg, setErrorMsg] = useState(""); // For file errors
+
+  // Handle text/number/select changes
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prevState) => ({
-      ...prevState,
-      [name]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  // Handle image selection
   const handleImageChange = (e) => {
-    const imageFile = e.target.files[0];
-    setFormData((prevState) => ({
-      ...prevState,
-      image: imageFile,
-    }));
+    const file = e.target.files[0];
+    if (file) {
+      // Check file type manually before submit
+      const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif"];
+      if (!allowedTypes.includes(file.type)) {
+        setErrorMsg("Only image files are allowed!");
+        setFormData((prev) => ({ ...prev, image: null }));
+        return;
+      } else {
+        setErrorMsg("");
+        setFormData((prev) => ({ ...prev, image: file }));
+      }
+    }
   };
 
+  // Handle form submit
   const handleSubmit = async (e) => {
     e.preventDefault();
-    try {
-      console.log(formData);
+    if (!formData.image) {
+      setErrorMsg("Please select a valid image file.");
+      return;
+    }
 
-      await axios.post("http://localhost:6005/product", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
+    try {
+      const data = new FormData();
+      data.append("name", formData.name);
+      data.append("category", formData.category);
+      data.append("price", formData.price);
+      data.append("image", formData.image);
+
+      await axios.post("http://localhost:6005/items", data, {
+        headers: { "Content-Type": "multipart/form-data" },
       });
+
       alert("Product added successfully!");
-      setFormData({
-        name: "",
-        category: "",
-        price: "",
-        image: null,
-      });
+      setFormData({ name: "", category: "", price: "", image: null });
+      setErrorMsg("");
     } catch (error) {
-      console.error("Error adding product:", error);
-      alert("Error adding product. Please try again.");
+      console.error(error);
+      alert(error.response?.data?.error || "Error adding product");
     }
   };
 
   return (
     <div className="max-w-md mx-auto mt-10">
-      <h1 className="text-2xl font-bold mb-4">
-        Add New <span className="text-Aorange">Product</span>
-      </h1>
+      <h1 className="mb-4 text-2xl font-bold">Add New Product</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block mb-1">Name:</label>
+          <label>Name:</label>
           <input
             type="text"
             name="name"
             value={formData.name}
             onChange={handleChange}
-            className="w-full border border-gray-300 rounded px-3 py-2"
             required
           />
         </div>
 
         <div>
-          <label className="block mb-1">Category:</label>
+          <label>Category:</label>
           <select
             name="category"
             value={formData.category}
             onChange={handleChange}
-            className="w-full border border-gray-300 rounded px-3 py-2"
             required
           >
             <option value="">Select category</option>
@@ -84,35 +94,29 @@ const AddProduct = () => {
         </div>
 
         <div>
-          <label className="block mb-1">Price:</label>
+          <label>Price:</label>
           <input
             type="number"
             name="price"
             value={formData.price}
             onChange={handleChange}
-            className="w-full border border-gray-300 rounded px-3 py-2"
             required
           />
         </div>
 
         <div>
-          <label className="block mb-1">Image:</label>
+          <label>Image:</label>
           <input
             type="file"
-            accept="image/*"
             name="image"
+            accept=".jpg, .jpeg, .png, .gif" // Hides non-image files in file picker
             onChange={handleImageChange}
-            className="w-full border border-gray-300 rounded px-3 py-2"
             required
           />
+          {errorMsg && <p style={{ color: "red" }}>{errorMsg}</p>}
         </div>
 
-        <button
-          type="submit"
-          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-        >
-          Add Product
-        </button>
+        <button type="submit">Add Product</button>
       </form>
     </div>
   );
