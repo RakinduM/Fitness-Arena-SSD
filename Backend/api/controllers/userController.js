@@ -2,6 +2,7 @@ import { User } from "../models/userModel.js";
 import { workout } from "../models/workoutModels.js"; // Import the workout model
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
+import { recordFailedAttempt, resetAttempts } from "../Middleware/userLoginLimiter.js";
 
 const createToken = (_id) => {
   return jwt.sign({ _id }, process.env.SECRET, { expiresIn: "1h" });
@@ -12,14 +13,30 @@ export const loginUser = async (req, res) => {
   const { email, password } = req.body;
 
   try {
+    // Try finding user
     const user = await User.loginUser(email, password);
+    if (!user) {
+      recordFailedAttempt(email);
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
 
-    //create token
+
+
+    // ✅ Successful login
+    resetAttempts(email); // clear failed attempts
+
+    // Create JWT
     const token = createToken(user._id);
 
-    res.status(201).json({ email, role: user.role, token });
+    return res.status(200).json({
+      email: user.email,
+      role: user.role,
+      token
+    });
+
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    console.error("Login error:", err);
+    return res.status(500).json({ message: "Server error" });
   }
 };
 
