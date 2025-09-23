@@ -1,10 +1,16 @@
 import { Carts } from "../models/cartModel.js";
 
-// Controller function to create a new cart item
+// Create a new cart item (linked to logged-in user)
 export const createCartItem = async (req, res) => {
   try {
-    const { menuItemId, quantity, email } = req.body;
-    const newCartItem = new Carts({ menuItemId, quantity, email });
+    const { menuItemId, quantity } = req.body;
+
+    const newCartItem = new Carts({
+      menuItemId,
+      quantity,
+      userId: req.user._id, // secure
+    });
+
     const savedCartItem = await newCartItem.save();
     res.status(201).json(savedCartItem);
   } catch (error) {
@@ -13,53 +19,30 @@ export const createCartItem = async (req, res) => {
   }
 };
 
-// Controller function to get carts by email
-export const getCartsByEmail = async (req, res) => {
-  const { email } = req.params;
+// Get carts of logged-in user
+export const getMyCarts = async (req, res) => {
   try {
-    const carts = await Carts.find({ email }).populate("menuItemId");
+    const carts = await Carts.find({ userId: req.user._id }).populate("menuItemId");
     res.json(carts);
   } catch (error) {
-    console.error("Error getting carts by email:", error);
-    res.status(500).json({ error: "Error getting carts by email" });
+    console.error("Error getting user carts:", error);
+    res.status(500).json({ error: "Error getting user carts" });
   }
 };
 
-// Controller function to retrieve all cart items
-export const getAllCartItems = async (req, res) => {
-  try {
-    const cartItems = await Carts.find().populate("menuItemId");
-    res.json(cartItems);
-  } catch (error) {
-    console.error("Error reading cart items:", error);
-    res.status(500).json({ error: "Error reading cart items" });
-  }
-};
-
-// Controller function to get a cart item by its ID
+// Get cart item by ID (only if belongs to user)
 export const getCartItemById = async (req, res) => {
   const itemId = req.params.id;
   try {
-    const cartItem = await Carts.findById(itemId).populate("menuItemId");
-    if (!cartItem) {
-      res.status(404).json({ error: "Cart item not found" });
-      return;
-    }
-    res.json(cartItem);
-  } catch (error) {
-    console.error("Error getting cart item:", error);
-    res.status(500).json({ error: "Error getting cart item" });
-  }
-};
+    const cartItem = await Carts.findOne({
+      _id: itemId,
+      userId: req.user._id, // ownership check
+    }).populate("menuItemId");
 
-// Controller function to get a cart item by menuItemId
-export const getCartByMenuItemId = async (req, res) => {
-  const menuItemId = req.params.id;
-  try {
-    const cartItem = await Carts.findOne({ menuItemId });
     if (!cartItem) {
       return res.status(404).json({ error: "Cart item not found" });
     }
+
     res.json(cartItem);
   } catch (error) {
     console.error("Error getting cart item:", error);
@@ -67,18 +50,20 @@ export const getCartByMenuItemId = async (req, res) => {
   }
 };
 
-// Controller function to update a cart item by its ID
+// Update cart item (only if belongs to user)
 export const updateCartItemById = async (req, res) => {
   const itemId = req.params.id;
-  const updatedCartItem = req.body;
   try {
-    const result = await Carts.findByIdAndUpdate(itemId, updatedCartItem, {
-      new: true,
-    });
+    const result = await Carts.findOneAndUpdate(
+      { _id: itemId, userId: req.user._id }, // secure
+      req.body,
+      { new: true }
+    );
+
     if (!result) {
-      res.status(404).json({ error: "Cart item not found" });
-      return;
+      return res.status(404).json({ error: "Cart item not found" });
     }
+
     res.json(result);
   } catch (error) {
     console.error("Error updating cart item:", error);
@@ -86,15 +71,19 @@ export const updateCartItemById = async (req, res) => {
   }
 };
 
-// Controller function to delete a cart item by its ID
+// Delete cart item (only if belongs to user)
 export const deleteCartItemById = async (req, res) => {
   const cartItemId = req.params.id;
   try {
-    const result = await Carts.findByIdAndDelete(cartItemId);
+    const result = await Carts.findOneAndDelete({
+      _id: cartItemId,
+      userId: req.user._id, // secure
+    });
+
     if (!result) {
-      res.status(404).json({ error: "Cart item not found" });
-      return;
+      return res.status(404).json({ error: "Cart item not found" });
     }
+
     res.json(result);
   } catch (error) {
     console.error("Error deleting cart item:", error);
