@@ -1,16 +1,19 @@
-// routes/appointmentRoutes.js
 import express from "express";
+import requireAuth from "../Middleware/requireAuth.js";
 import {
   createAppointment,
   getAllAppointments,
   getAppointmentById,
   updateAppointmentById,
   deleteAppointmentById,
-} from "../controllers/appointmentControllers.js";
+} from "../controllers/appointmentController.js";
 
 const router = express.Router();
 
-// Routes
+// Apply auth middleware to all routes
+router.use(requireAuth);
+
+// Routes (now protected)
 router.post("/", createAppointment);
 router.get("/", getAllAppointments);
 router.get("/:id", getAppointmentById);

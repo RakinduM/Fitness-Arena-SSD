@@ -1,6 +1,6 @@
 import express from 'express';
 import { createItem, getAllItems } from '../controllers/itemController.js';
-import upload from '../Middleware/multermiddleware.js';
+import upload from '../Middleware/multerMiddleware.js';
 
 const router = express.Router();
 
