@@ -16,6 +16,11 @@ const router = express.Router();
 //login
 router.post("/login", authLimiter, checkUserAttempts, loginUser)
 
+
+
+
+
+
 // Create a new user
 router.post("/register", registerUser);
 

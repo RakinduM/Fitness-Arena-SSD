@@ -32,6 +32,19 @@ const app = express();
 
 // Helmet sets security headers, including X-Content-Type-Options: nosniff
 app.use(helmet());
+app.use(
+  helmet.contentSecurityPolicy({
+    useDefaults: true,
+    directives: {
+      "default-src": ["'self'"],
+      "script-src": ["'self'", "https://apis.google.com"],
+      "style-src": ["'self'", "'unsafe-inline'"],
+      "img-src": ["'self'", "data:"],
+      "connect-src": ["'self'"],
+      "font-src": ["'self'", "https://fonts.gstatic.com"]
+    }
+  })
+);
 //middleware
 app.use(express.json());
 app.use(cors());
