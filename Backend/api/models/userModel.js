@@ -11,18 +11,26 @@ const userSchema = mongoose.Schema(
     },
     username: {
       type: String,
-      required: true,
+      required: function() {
+        return !this.googleId; // Not required for OAuth users
+      },
       unique: true,
+      sparse: true, // Add this line
     },
     email: {
       type: String,
       required: true,
       unique: true,
     },
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true, // Allows null values while maintaining uniqueness for non-null values
+    },
     role: {
       type: String,
-      enum: ["user", "admin", "pkgManager", "pmtManager"], // Define roles, you can extend this as needed
-      default: "user", // Default role is user
+      enum: ["user", "admin", "pkgManager", "pmtManager", "customer"], // Added "customer" for OAuth users
+      default: "user",
     },
     biodata: {
       type: mongoose.Schema.Types.ObjectId,
@@ -34,7 +42,9 @@ const userSchema = mongoose.Schema(
     },
     password: {
       type: String,
-      required: true,
+      required: function() {
+        return !this.googleId; // Password not required if user has googleId
+      },
     },
   },
   { timestamps: true }
