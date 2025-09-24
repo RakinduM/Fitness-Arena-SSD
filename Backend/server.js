@@ -3,6 +3,7 @@ import express from "express";
 //import { Server } from "socket.io"; // Import the 'Server' class from 'socket.io'
 import { PORT, mongoDBUrl } from "./config.js";
 import cors from "cors";
+import helmet from "helmet";
 import mongoose from "mongoose";
 import workoutRoutes from "./api/routes/workoutRoute.js";
 import userRoutes from "./api/routes/userRoute.js";
@@ -29,6 +30,8 @@ const app = express();
 //const server = createServer(app); // Create an HTTP server instance
 //const io = new Server(server); // Create a new instance of the Socket.IO server
 
+// Helmet sets security headers, including X-Content-Type-Options: nosniff
+app.use(helmet());
 //middleware
 app.use(express.json());
 app.use(cors());
