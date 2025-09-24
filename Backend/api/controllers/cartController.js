@@ -1,6 +1,7 @@
 import { Carts } from "../models/cartModel.js";
 import { validationResult } from "express-validator";
 import validator from "validator";
+import mongoSanitize from "mongo-sanitize";
 
 // Controller function to create a new cart item
 export const createCartItem = async (req, res) => {
@@ -14,13 +15,15 @@ export const createCartItem = async (req, res) => {
   }
 
   try {
-    const { menuItemId, quantity, email } = req.body;
+    // Sanitize the entire request body
+    const sanitizedBody = mongoSanitize(req.body);
+    const { menuItemId, quantity, email } = sanitizedBody;
 
-    // Sanitize input data
+    // Whitelist and sanitize input data
     const sanitizedData = {
-      menuItemId,
+      menuItemId: String(menuItemId),
       quantity: parseInt(quantity),
-      email: validator.normalizeEmail(email),
+      email: validator.normalizeEmail(String(email)),
     };
 
     const newCartItem = new Carts(sanitizedData);
@@ -34,18 +37,20 @@ export const createCartItem = async (req, res) => {
 
 // Controller function to get carts by email
 export const getCartsByEmail = async (req, res) => {
-  const { email } = req.params;
+  // Sanitize parameters
+  const sanitizedParams = mongoSanitize(req.params);
+  const { email } = sanitizedParams;
 
   // Validate email parameter
-  if (!validator.isEmail(email)) {
+  if (!validator.isEmail(String(email))) {
     return res.status(400).json({ error: "Invalid email format" });
   }
 
   try {
-    const normalizedEmail = validator.normalizeEmail(email);
-    const carts = await Carts.find({ email: normalizedEmail }).populate(
-      "menuItemId"
-    );
+    const normalizedEmail = validator.normalizeEmail(String(email));
+    // Whitelist query fields - only allow email
+    const query = { email: normalizedEmail };
+    const carts = await Carts.find(query).populate("menuItemId");
     res.json(carts);
   } catch (error) {
     console.error("Error getting carts by email:", error);
@@ -82,9 +87,14 @@ export const getCartItemById = async (req, res) => {
 
 // Controller function to get a cart item by menuItemId
 export const getCartByMenuItemId = async (req, res) => {
-  const menuItemId = req.params.id;
+  // Sanitize parameters
+  const sanitizedParams = mongoSanitize(req.params);
+  const menuItemId = String(sanitizedParams.id);
+
   try {
-    const cartItem = await Carts.findOne({ menuItemId });
+    // Whitelist query fields - only allow menuItemId
+    const query = { menuItemId: menuItemId };
+    const cartItem = await Carts.findOne(query);
     if (!cartItem) {
       return res.status(404).json({ error: "Cart item not found" });
     }
@@ -106,22 +116,29 @@ export const updateCartItemById = async (req, res) => {
     });
   }
 
-  const itemId = req.params.id;
-  const updatedCartItem = req.body;
+  // Sanitize parameters and body
+  const itemId = mongoSanitize(req.params.id);
+  const sanitizedBody = mongoSanitize(req.body);
 
   try {
-    // Sanitize input data
+    // Whitelist and sanitize input data
     const sanitizedData = {};
-    if (updatedCartItem.menuItemId)
-      sanitizedData.menuItemId = updatedCartItem.menuItemId;
-    if (updatedCartItem.quantity)
-      sanitizedData.quantity = parseInt(updatedCartItem.quantity);
-    if (updatedCartItem.email)
-      sanitizedData.email = validator.normalizeEmail(updatedCartItem.email);
+    if (sanitizedBody.menuItemId)
+      sanitizedData.menuItemId = String(sanitizedBody.menuItemId);
+    if (sanitizedBody.quantity)
+      sanitizedData.quantity = parseInt(sanitizedBody.quantity);
+    if (sanitizedBody.email)
+      sanitizedData.email = validator.normalizeEmail(
+        String(sanitizedBody.email)
+      );
 
-    const result = await Carts.findByIdAndUpdate(itemId, sanitizedData, {
-      new: true,
-    });
+    const result = await Carts.findByIdAndUpdate(
+      String(itemId),
+      sanitizedData,
+      {
+        new: true,
+      }
+    );
     if (!result) {
       res.status(404).json({ error: "Cart item not found" });
       return;

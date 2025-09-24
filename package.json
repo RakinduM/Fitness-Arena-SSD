@@ -12,6 +12,7 @@
     "antd": "^5.16.0",
     "axios": "^1.6.8",
     "date-fns": "^3.6.0",
+    "mongo-sanitize": "^1.1.0",
     "react-toastify": "^10.0.5",
     "styled-components": "^6.1.8",
     "sweetalert2": "^11.14.1"

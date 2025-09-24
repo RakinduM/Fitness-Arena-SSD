@@ -2,6 +2,7 @@ import { Feedback } from "../models/feedbackModel.js";
 import mongoose from "mongoose";
 import { validationResult } from "express-validator";
 import validator from "validator";
+import mongoSanitize from "mongo-sanitize";
 
 // Controller for creating new feedback
 async function createFeedback(req, res) {
@@ -15,20 +16,24 @@ async function createFeedback(req, res) {
   }
 
   try {
-    const feedbackData = Array.isArray(req.body) ? req.body : [req.body];
+    // Sanitize the entire request body
+    const sanitizedBody = mongoSanitize(req.body);
+    const feedbackData = Array.isArray(sanitizedBody)
+      ? sanitizedBody
+      : [sanitizedBody];
     const createdFeedbacks = [];
 
     for (const data of feedbackData) {
-      // Additional sanitization
+      // Whitelist and sanitize input data
       const sanitizedData = {
-        firstName: validator.escape(data.firstName || "").trim(),
-        lastName: validator.escape(data.lastName || "").trim(),
-        email: validator.normalizeEmail(data.email || ""),
+        firstName: validator.escape(String(data.firstName || "")).trim(),
+        lastName: validator.escape(String(data.lastName || "")).trim(),
+        email: validator.normalizeEmail(String(data.email || "")),
         membershipId: data.membershipId
-          ? validator.escape(data.membershipId.toString()).trim()
+          ? validator.escape(String(data.membershipId)).trim()
           : null,
-        topic: data.topic,
-        feedback: validator.escape(data.feedback || "").trim(),
+        topic: String(data.topic || ""),
+        feedback: validator.escape(String(data.feedback || "")).trim(),
       };
 
       const feedback = new Feedback(sanitizedData);
@@ -77,24 +82,36 @@ async function updateFeedbackById(req, res) {
   }
 
   try {
-    // Sanitize input data
+    // Sanitize parameters and body
+    const feedbackId = mongoSanitize(req.params.id);
+    const sanitizedBody = mongoSanitize(req.body);
+
+    // Whitelist and sanitize input data
     const sanitizedData = {};
-    if (req.body.firstName)
-      sanitizedData.firstName = validator.escape(req.body.firstName).trim();
-    if (req.body.lastName)
-      sanitizedData.lastName = validator.escape(req.body.lastName).trim();
-    if (req.body.email)
-      sanitizedData.email = validator.normalizeEmail(req.body.email);
-    if (req.body.membershipId)
-      sanitizedData.membershipId = validator
-        .escape(req.body.membershipId.toString())
+    if (sanitizedBody.firstName)
+      sanitizedData.firstName = validator
+        .escape(String(sanitizedBody.firstName))
         .trim();
-    if (req.body.topic) sanitizedData.topic = req.body.topic;
-    if (req.body.feedback)
-      sanitizedData.feedback = validator.escape(req.body.feedback).trim();
+    if (sanitizedBody.lastName)
+      sanitizedData.lastName = validator
+        .escape(String(sanitizedBody.lastName))
+        .trim();
+    if (sanitizedBody.email)
+      sanitizedData.email = validator.normalizeEmail(
+        String(sanitizedBody.email)
+      );
+    if (sanitizedBody.membershipId)
+      sanitizedData.membershipId = validator
+        .escape(String(sanitizedBody.membershipId))
+        .trim();
+    if (sanitizedBody.topic) sanitizedData.topic = String(sanitizedBody.topic);
+    if (sanitizedBody.feedback)
+      sanitizedData.feedback = validator
+        .escape(String(sanitizedBody.feedback))
+        .trim();
 
     const feedback = await Feedback.findByIdAndUpdate(
-      req.params.id,
+      String(feedbackId),
       sanitizedData,
       {
         new: true,
@@ -124,16 +141,20 @@ async function deleteFeedbackById(req, res) {
 
 // Controller for fetching feedbacks by email
 async function getFeedbacksByEmail(req, res) {
-  const { email } = req.params;
+  // Sanitize parameters
+  const sanitizedParams = mongoSanitize(req.params);
+  const { email } = sanitizedParams;
 
   // Validate email parameter
-  if (!validator.isEmail(email)) {
+  if (!validator.isEmail(String(email))) {
     return res.status(400).json({ message: "Invalid email format" });
   }
 
   try {
-    const normalizedEmail = validator.normalizeEmail(email);
-    const feedback = await Feedback.find({ email: normalizedEmail });
+    const normalizedEmail = validator.normalizeEmail(String(email));
+    // Whitelist query fields - only allow email
+    const query = { email: normalizedEmail };
+    const feedback = await Feedback.find(query);
     res.send(feedback);
   } catch (error) {
     res.status(500).send(error);

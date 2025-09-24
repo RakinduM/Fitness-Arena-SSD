@@ -1,6 +1,7 @@
 import { workout } from "../models/workoutModels.js";
 import { validationResult } from "express-validator";
 import validator from "validator";
+import mongoSanitize from "mongo-sanitize";
 
 // Create a workout
 export const createWorkout = async (req, res) => {
@@ -13,15 +14,17 @@ export const createWorkout = async (req, res) => {
     });
   }
 
-  const { title, reps, load, userId } = req.body; // Assuming userId is provided in the request body
-
   try {
-    // Sanitize input data
+    // Sanitize the entire request body
+    const sanitizedBody = mongoSanitize(req.body);
+    const { title, reps, load, userId } = sanitizedBody;
+
+    // Whitelist and sanitize input data
     const sanitizedData = {
-      title: validator.escape(title).trim(),
-      reps: parseInt(reps),
-      load: parseFloat(load),
-      user: userId,
+      title: validator.escape(String(title || "")).trim(),
+      reps: parseInt(reps) || 0,
+      load: parseFloat(load) || 0,
+      user: String(userId || ""),
     };
 
     const newItem = await workout.create(sanitizedData);
@@ -47,12 +50,15 @@ export const createWorkout = async (req, res) => {
 // Get all workouts for the logged-in user
 export const getWorkouts = async (req, res) => {
   try {
-    // Retrieve the user ID from req.user
-    const userId = req.user._id;
+    // Sanitize the user ID from req.user
+    const userId = mongoSanitize(req.user._id);
+
+    // Whitelist query fields - only allow user field with sanitized userId
+    const query = { user: String(userId) };
 
     // Find workouts that belong to the user
     const workouts = await workout
-      .find({ user: userId })
+      .find(query)
       .sort({ createdAt: -1 })
       .populate("user");
     res.status(200).json(workouts);
@@ -66,10 +72,12 @@ export const getWorkouts = async (req, res) => {
 
 // Get a single workout by ID
 export const getWorkoutById = async (req, res) => {
-  const { id } = req.params;
+  // Sanitize parameters
+  const sanitizedParams = mongoSanitize(req.params);
+  const { id } = sanitizedParams;
 
   try {
-    const foundWorkout = await workout.findById(id).populate("user");
+    const foundWorkout = await workout.findById(String(id)).populate("user");
 
     if (!foundWorkout) {
       return res.status(404).json({ message: "Workout not found." });
@@ -86,10 +94,12 @@ export const getWorkoutById = async (req, res) => {
 
 // Delete a workout by ID
 export const deleteWorkoutById = async (req, res) => {
-  const { id } = req.params;
+  // Sanitize parameters
+  const sanitizedParams = mongoSanitize(req.params);
+  const { id } = sanitizedParams;
 
   try {
-    const deletedWorkout = await workout.findByIdAndDelete(id);
+    const deletedWorkout = await workout.findByIdAndDelete(String(id));
 
     if (!deletedWorkout) {
       return res.status(404).json({ message: "Workout not found." });
@@ -115,19 +125,26 @@ export const updateWorkoutById = async (req, res) => {
     });
   }
 
-  const { id } = req.params;
-  const { title, reps, load } = req.body;
+  // Sanitize parameters and body
+  const sanitizedParams = mongoSanitize(req.params);
+  const sanitizedBody = mongoSanitize(req.body);
+  const { id } = sanitizedParams;
+  const { title, reps, load } = sanitizedBody;
 
   try {
-    // Sanitize input data
+    // Whitelist and sanitize input data
     const sanitizedData = {};
-    if (title) sanitizedData.title = validator.escape(title).trim();
+    if (title) sanitizedData.title = validator.escape(String(title)).trim();
     if (reps) sanitizedData.reps = parseInt(reps);
     if (load) sanitizedData.load = parseFloat(load);
 
-    const updatedWorkout = await workout.findByIdAndUpdate(id, sanitizedData, {
-      new: true,
-    });
+    const updatedWorkout = await workout.findByIdAndUpdate(
+      String(id),
+      sanitizedData,
+      {
+        new: true,
+      }
+    );
 
     if (!updatedWorkout) {
       return res.status(404).json({ message: "Workout not found." });
