@@ -72,14 +72,14 @@ const Cards = ({ item }) => {
 
   return (
     <div>
-      <div className="card w-96 bg-base-100 shadow-xl">
+      <div className="shadow-xl card w-96 bg-base-100">
         <div
           className={`rating gap-1 absolute right-2 top-2 p-4 heartStar bg-Aorange ${
             isHeartFilled ? "text-rose-500" : "text-white"
           }`}
           onClick={handleHeartClick}
         >
-          <FaHeart className="h-5 w-5 cursor" />
+          <FaHeart className="w-5 h-5 cursor" />
         </div>
         <Link to={`/product/${item.id}`} className="card-image">
           <figure>
@@ -88,7 +88,7 @@ const Cards = ({ item }) => {
                 item.image
               )}`}
               alt="image"
-              className="card-image hover:scale-105 transition duration-200 md:h-72"
+              className="transition duration-200 card-image hover:scale-105 md:h-72"
             />
           </figure>
         </Link>
@@ -96,7 +96,7 @@ const Cards = ({ item }) => {
           <Link to={`/product/${item.id}`}>
             <h2 className="card-title">{item.name}</h2>
           </Link>
-          <div className="card-actions justify-between items-center mt-2">
+          <div className="items-center justify-between mt-2 card-actions">
             <h5 className="font-semibold">Rs.{item.price}</h5>
             <button
               className="btn bg-Aorange"
