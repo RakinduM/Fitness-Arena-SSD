@@ -43,7 +43,7 @@ app.use(express.static("public"));
 
 //session middleware
 app.use(session({
-  secret: process.env.SESSION_SECRET || "your_secret",
+  secret: process.env.SESSION_SECRET,
   resave: false, 
   saveUninitialized: false,
   cookie: {
@@ -91,7 +91,7 @@ async function(accessToken, refreshToken, profile, done){
           fullName: profile.displayName,
           username: username, // Use the unique username
           email: profile.emails[0].value,
-          role: 'customer',
+          role: 'user',
           // Remove password field - not required for OAuth users
         });
         
@@ -120,7 +120,7 @@ app.get("/auth/google", passport.authenticate("google", {scope: ["profile", "ema
 app.get("/auth/google/callback", passport.authenticate("google", {failureRedirect: "http://localhost:5173/login"}),
 (req, res) => {
   // Successful authentication - redirect to frontend
-  res.redirect("http://localhost:5173/dashboard"); // Update to port 5173
+  res.redirect("http://localhost:5173/"); // Update to port 5173
 });
 
 app.get("/auth/logout", (req, res) => {
