@@ -5,17 +5,27 @@ import {
   getFeedbackById,
   updateFeedbackById,
   deleteFeedbackById,
-  getFeedbacksByEmail
+  getFeedbacksByEmail,
 } from "../controllers/feedbackControllers.js";
+import {
+  validateFeedback,
+  validateFeedbackUpdate,
+  validateObjectId,
+  validateEmail,
+} from "../Middleware/validationMiddleware.js";
 
 const router = express.Router();
 
-router.post("/", createFeedback);
-router.get("/:email", getFeedbacksByEmail);
+router.post("/", validateFeedback, createFeedback);
+router.get("/email/:email", validateEmail, getFeedbacksByEmail);
 router.get("/", getAllFeedback);
-router.get("/:id", getFeedbackById);
-router.put("/:id", updateFeedbackById);
-router.delete("/:id", deleteFeedbackById);
-
+router.get("/:id", validateObjectId, getFeedbackById);
+router.put(
+  "/:id",
+  validateObjectId,
+  validateFeedbackUpdate,
+  updateFeedbackById
+);
+router.delete("/:id", validateObjectId, deleteFeedbackById);
 
 export default router;

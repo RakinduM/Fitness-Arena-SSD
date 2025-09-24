@@ -1,10 +1,29 @@
 import { Carts } from "../models/cartModel.js";
+import { validationResult } from "express-validator";
+import validator from "validator";
 
 // Controller function to create a new cart item
 export const createCartItem = async (req, res) => {
+  // Check validation errors
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      message: "Validation failed",
+      errors: errors.array(),
+    });
+  }
+
   try {
     const { menuItemId, quantity, email } = req.body;
-    const newCartItem = new Carts({ menuItemId, quantity, email });
+
+    // Sanitize input data
+    const sanitizedData = {
+      menuItemId,
+      quantity: parseInt(quantity),
+      email: validator.normalizeEmail(email),
+    };
+
+    const newCartItem = new Carts(sanitizedData);
     const savedCartItem = await newCartItem.save();
     res.status(201).json(savedCartItem);
   } catch (error) {
@@ -16,8 +35,17 @@ export const createCartItem = async (req, res) => {
 // Controller function to get carts by email
 export const getCartsByEmail = async (req, res) => {
   const { email } = req.params;
+
+  // Validate email parameter
+  if (!validator.isEmail(email)) {
+    return res.status(400).json({ error: "Invalid email format" });
+  }
+
   try {
-    const carts = await Carts.find({ email }).populate("menuItemId");
+    const normalizedEmail = validator.normalizeEmail(email);
+    const carts = await Carts.find({ email: normalizedEmail }).populate(
+      "menuItemId"
+    );
     res.json(carts);
   } catch (error) {
     console.error("Error getting carts by email:", error);
@@ -69,10 +97,29 @@ export const getCartByMenuItemId = async (req, res) => {
 
 // Controller function to update a cart item by its ID
 export const updateCartItemById = async (req, res) => {
+  // Check validation errors
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      message: "Validation failed",
+      errors: errors.array(),
+    });
+  }
+
   const itemId = req.params.id;
   const updatedCartItem = req.body;
+
   try {
-    const result = await Carts.findByIdAndUpdate(itemId, updatedCartItem, {
+    // Sanitize input data
+    const sanitizedData = {};
+    if (updatedCartItem.menuItemId)
+      sanitizedData.menuItemId = updatedCartItem.menuItemId;
+    if (updatedCartItem.quantity)
+      sanitizedData.quantity = parseInt(updatedCartItem.quantity);
+    if (updatedCartItem.email)
+      sanitizedData.email = validator.normalizeEmail(updatedCartItem.email);
+
+    const result = await Carts.findByIdAndUpdate(itemId, sanitizedData, {
       new: true,
     });
     if (!result) {

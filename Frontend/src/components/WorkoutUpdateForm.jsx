@@ -2,9 +2,11 @@ import React, { useState } from "react";
 import { useFormik } from "formik";
 import * as Yup from "yup";
 import { useAuthContext } from "../hooks/useAuthContext";
+import { useSnackbar } from "notistack";
 
 const WorkoutUpdateForm = ({ workout, onClose }) => {
   const { user } = useAuthContext();
+  const { enqueueSnackbar } = useSnackbar();
   const [error, setError] = useState(null);
   const [emptyFields, setEmptyFields] = useState([]);
 
@@ -17,20 +19,33 @@ const WorkoutUpdateForm = ({ workout, onClose }) => {
     validationSchema: Yup.object({
       title: Yup.string()
         .required("Exercise Title is required")
-        .matches(/^[a-zA-Z\s]*$/, {
-          message: "Only letters and spaces are allowed",
+        .matches(/^[a-zA-Z0-9\s\-_]+$/, {
+          message:
+            "Title can only contain letters, numbers, spaces, hyphens and underscores",
           excludeEmptyString: true,
-        }),
+        })
+        .min(1, "Exercise title must be at least 1 character")
+        .max(100, "Exercise title must be less than 100 characters"),
       load: Yup.number()
         .required("Load is required")
+        .min(0, "Load must be 0 or greater")
+        .max(10000, "Load must be less than 10000")
         .positive("Load must be a positive number"),
       reps: Yup.number()
         .required("Reps are required")
+        .min(1, "Reps must be at least 1")
+        .max(1000, "Reps must be less than 1000")
+        .integer("Reps must be a whole number")
         .positive("Reps must be a positive number"),
     }),
     onSubmit: async (values) => {
       if (!user) {
         setError("You must be logged in");
+        enqueueSnackbar("Authentication error. Please log in again.", {
+          variant: "error",
+          autoHideDuration: 4000,
+          anchorOrigin: { vertical: "top", horizontal: "right" },
+        });
         return;
       }
 
@@ -50,12 +65,42 @@ const WorkoutUpdateForm = ({ workout, onClose }) => {
       const json = await response.json();
 
       if (!response.ok) {
+        // Handle validation errors from backend
+        if (response.status === 400 && json.errors) {
+          json.errors.forEach((err) => {
+            enqueueSnackbar(`${err.path}: ${err.msg}`, {
+              variant: "error",
+              autoHideDuration: 5000,
+              anchorOrigin: { vertical: "top", horizontal: "right" },
+            });
+          });
+        } else if (json.message) {
+          enqueueSnackbar(`Error: ${json.message}`, {
+            variant: "error",
+            autoHideDuration: 4000,
+            anchorOrigin: { vertical: "top", horizontal: "right" },
+          });
+        } else {
+          enqueueSnackbar(
+            json.error || "Failed to update workout. Please try again.",
+            {
+              variant: "error",
+              autoHideDuration: 4000,
+              anchorOrigin: { vertical: "top", horizontal: "right" },
+            }
+          );
+        }
         setError(json.error);
         setEmptyFields(json.emptyFields || []);
       }
       if (response.ok) {
         setError(null);
         setEmptyFields([]);
+        enqueueSnackbar("Workout updated successfully!", {
+          variant: "success",
+          autoHideDuration: 3000,
+          anchorOrigin: { vertical: "top", horizontal: "right" },
+        });
         onClose(); // Close the form after successful update
       }
     },
