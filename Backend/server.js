@@ -4,6 +4,10 @@ import express from "express";
 import { PORT, mongoDBUrl } from "./config.js";
 import cors from "cors";
 import mongoose from "mongoose";
+import passport from "passport";
+import session from "express-session";
+import { Strategy as GoogleStrategy } from "passport-google-oauth20";
+import { User } from "./api/models/userModel.js";
 import workoutRoutes from "./api/routes/workoutRoute.js";
 import userRoutes from "./api/routes/userRoute.js";
 import packcageRoutes from "./api/routes/packageRoutes.js";
@@ -31,8 +35,108 @@ const app = express();
 
 //middleware
 app.use(express.json());
-app.use(cors());
+app.use(cors({
+  origin: "http://localhost:5173", // Update to your frontend port
+  credentials: true
+}));
 app.use(express.static("public"));
+
+//session middleware
+app.use(session({
+  secret: process.env.SESSION_SECRET,
+  resave: false, 
+  saveUninitialized: false,
+  cookie: {
+    secure: false,
+    maxAge: 24 * 60 * 60 * 1000
+  }
+}));
+app.use(passport.initialize());
+app.use(passport.session());
+
+//configure Google strategy
+passport.use(new GoogleStrategy({
+  clientID: process.env.GOOGLE_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  callbackURL: "/auth/google/callback"
+},
+async function(accessToken, refreshToken, profile, done){
+  try {
+    // Check if user already exists with Google ID
+    let user = await User.findOne({ googleId: profile.id });
+    
+    if (user) {
+      return done(null, user);
+    } else {
+      // Check if user exists with same email
+      user = await User.findOne({ email: profile.emails[0].value });
+      
+      if (user) {
+        // Link Google account to existing user
+        user.googleId = profile.id;
+        await user.save();
+        return done(null, user);
+      } else {
+        // Create new user
+        let username = profile.emails[0].value.split('@')[0];
+        
+        // Check if username already exists and make it unique
+        const existingUsername = await User.findOne({ username });
+        if (existingUsername) {
+          username = `${username}_${Date.now()}`;
+        }
+        
+        const newUser = new User({
+          googleId: profile.id,
+          fullName: profile.displayName,
+          username: username, // Use the unique username
+          email: profile.emails[0].value,
+          role: 'user',
+          // Remove password field - not required for OAuth users
+        });
+        
+        const savedUser = await newUser.save();
+        return done(null, savedUser);
+      }
+    }
+  } catch (error) {
+    return done(error, null);
+  }
+}));
+
+passport.serializeUser((user, done) => done(null, user._id));
+passport.deserializeUser(async (id, done) => {
+  try {
+    const user = await User.findById(id);
+    done(null, user);
+  } catch (error) {
+    done(error, null);
+  }
+});
+
+//Google OAuth routes
+app.get("/auth/google", passport.authenticate("google", {scope: ["profile", "email"]}));
+
+app.get("/auth/google/callback", passport.authenticate("google", {failureRedirect: "http://localhost:5173/login"}),
+(req, res) => {
+  // Successful authentication - redirect to frontend
+  res.redirect("http://localhost:5173/"); // Update to port 5173
+});
+
+app.get("/auth/logout", (req, res) => {
+  req.logout((err) => {
+    if (err) return res.status(500).json({ error: err });
+    res.redirect("http://localhost:5173/"); // Update to port 5173
+  });
+});
+
+app.get("/auth/user", (req, res) => {
+  if (req.isAuthenticated()) {
+    res.json({ user: req.user });
+  } else {
+    res.status(401).json({ message: "Not authenticated" });
+  }
+});
 
 app.get("/", (req, res) => {
   return res.status(234).send("hello world");

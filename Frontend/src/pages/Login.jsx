@@ -3,6 +3,7 @@ import { useFormik } from "formik";
 import { Link } from "react-router-dom"; // Import Link for navigation
 import * as Yup from "yup";
 import { useLogin } from "../hooks/useLogin";
+import GoogleLogin from "../components/GoogleLogin"; 
 import loginImage from "../assets/login-image.png";
 
 const Login = () => {
@@ -45,6 +46,18 @@ const Login = () => {
           <h3 className="text-3xl font-bold mb-6 text-center text-orange-500">
             Log In
           </h3>
+
+          {/* Add Google Sign-in Button */}
+          <div className="mb-6">
+            <GoogleLogin />
+          </div>
+
+          {/* Add divider */}
+          <div className="flex items-center my-6">
+            <div className="flex-grow border-t border-gray-300"></div>
+            <span className="flex-shrink mx-4 text-gray-400 text-sm">OR</span>
+            <div className="flex-grow border-t border-gray-300"></div>
+          </div>
 
           <div className="mb-6">
             <label
@@ -107,7 +120,7 @@ const Login = () => {
             {error && <div className="error">{error}</div>}
           </div>
           {/* "Don't have an account" link */}
-          <div className="text-center">
+          <div className="text-center mt-4">
             <Link
               to="/register"
               className="text-gray-600 hover:text-gray-800 font-bold text-sm"
