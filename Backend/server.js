@@ -3,6 +3,7 @@ import express from "express";
 //import { Server } from "socket.io"; // Import the 'Server' class from 'socket.io'
 import { PORT, mongoDBUrl } from "./config.js";
 import cors from "cors";
+import helmet from "helmet";
 import mongoose from "mongoose";
 import passport from "passport";
 import session from "express-session";
@@ -33,6 +34,21 @@ const app = express();
 //const server = createServer(app); // Create an HTTP server instance
 //const io = new Server(server); // Create a new instance of the Socket.IO server
 
+// Helmet sets security headers, including X-Content-Type-Options: nosniff
+app.use(helmet());
+app.use(
+  helmet.contentSecurityPolicy({
+    useDefaults: true,
+    directives: {
+      "default-src": ["'self'"],
+      "script-src": ["'self'", "https://apis.google.com"],
+      "style-src": ["'self'", "'unsafe-inline'"],
+      "img-src": ["'self'", "data:"],
+      "connect-src": ["'self'"],
+      "font-src": ["'self'", "https://fonts.gstatic.com"]
+    }
+  })
+);
 //middleware
 app.use(express.json());
 app.use(cors({

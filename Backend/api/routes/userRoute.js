@@ -8,11 +8,18 @@ import {
   updateUserById,
   deleteUserById
 } from "../controllers/userController.js";
+import { authLimiter } from "../Middleware/rateLimiter.js";
+import { checkUserAttempts } from "../Middleware/userLoginLimiter.js";
 
 const router = express.Router();
 
 //login
-router.post("/login", loginUser)
+router.post("/login", authLimiter, checkUserAttempts, loginUser)
+
+
+
+
+
 
 // Create a new user
 router.post("/register", registerUser);

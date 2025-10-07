@@ -1,4 +1,5 @@
 import { Feedback } from "../models/feedbackModel.js";
+import escapeHtml from "escape-html";
 import mongoose from "mongoose";
  
 // Controller for creating new feedback
@@ -36,7 +37,13 @@ async function getFeedbackById(req, res) {
     if (!feedback) {
       return res.status(404).send();
     }
-    res.send(feedback);
+    // Escape user-submitted fields
+    const safeFeedback = {
+      ...feedback._doc, // copy all other fields
+      comment: escapeHtml(feedback.comment), // escape only user content
+    };
+
+    res.send(safeFeedback);
   } catch (error) {
     res.status(500).send(error);
   }
@@ -76,10 +83,18 @@ async function getFeedbacksByEmail(req, res) {
   const { email } = req.params;
 
   try {
-    const feedback = await Feedback.find({ email: email });
-    res.send(feedback);
+    const feedbacks = await Feedback.find({ email });
+
+    // Escape user-submitted fields (e.g., comment)
+    const safeFeedbacks = feedbacks.map(fb => ({
+      ...fb._doc, // copy other fields
+      comment: escapeHtml(fb.comment) // escape HTML in comment
+    }));
+
+    res.status(200).json(safeFeedbacks);
   } catch (error) {
-    res.status(500).send(error);
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
   }
 }
 
