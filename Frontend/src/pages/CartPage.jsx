@@ -5,10 +5,12 @@ import Swal from "sweetalert2";
 import { FaTrash } from "react-icons/fa";
 import { Link } from "react-router-dom";
 import axios from "axios";
+import { useSnackbar } from "notistack";
 
 const CartPage = () => {
   const { user } = useContext(AuthContext);
   const [cart, refetch] = useCart();
+  const { enqueueSnackbar } = useSnackbar();
   console.log(cart);
   const [cartItems, setCartItems] = useState([]);
   // console.log(cartItems)
@@ -46,11 +48,35 @@ const CartPage = () => {
         });
         await refetch();
         setCartItems(updatedCart);
+        enqueueSnackbar("Quantity updated successfully", {
+          variant: "success",
+          autoHideDuration: 2000,
+          anchorOrigin: { vertical: "top", horizontal: "right" },
+        });
       } else {
+        const errorData = await response.json();
+        let errorMessage = "Failed to update quantity";
+
+        if (response.status === 400 && errorData.errors) {
+          errorMessage = errorData.errors.map((err) => err.msg).join(", ");
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
+        }
+
+        enqueueSnackbar(errorMessage, {
+          variant: "error",
+          autoHideDuration: 4000,
+          anchorOrigin: { vertical: "top", horizontal: "right" },
+        });
         console.error("Failed to update quantity");
       }
     } catch (error) {
       console.error("Error updating quantity:", error);
+      enqueueSnackbar("Network error. Please try again.", {
+        variant: "error",
+        autoHideDuration: 4000,
+        anchorOrigin: { vertical: "top", horizontal: "right" },
+      });
     }
   };
 
@@ -81,12 +107,42 @@ const CartPage = () => {
           });
           await refetch();
           setCartItems(updatedCart);
+          enqueueSnackbar("Quantity updated successfully", {
+            variant: "success",
+            autoHideDuration: 2000,
+            anchorOrigin: { vertical: "top", horizontal: "right" },
+          });
         } else {
+          const errorData = await response.json();
+          let errorMessage = "Failed to update quantity";
+
+          if (response.status === 400 && errorData.errors) {
+            errorMessage = errorData.errors.map((err) => err.msg).join(", ");
+          } else if (errorData.message) {
+            errorMessage = errorData.message;
+          }
+
+          enqueueSnackbar(errorMessage, {
+            variant: "error",
+            autoHideDuration: 4000,
+            anchorOrigin: { vertical: "top", horizontal: "right" },
+          });
           console.error("Failed to update quantity");
         }
       } catch (error) {
         console.error("Error updating quantity:", error);
+        enqueueSnackbar("Network error. Please try again.", {
+          variant: "error",
+          autoHideDuration: 4000,
+          anchorOrigin: { vertical: "top", horizontal: "right" },
+        });
       }
+    } else {
+      enqueueSnackbar("Quantity cannot be less than 1", {
+        variant: "warning",
+        autoHideDuration: 3000,
+        anchorOrigin: { vertical: "top", horizontal: "right" },
+      });
     }
   };
 
@@ -221,9 +277,9 @@ const CartPage = () => {
                 <span id="total-price">Rs.{orderTotal.toFixed(2)}</span>
               </p>
               <Link to="/minindi">
-              <button className="btn btn-md bg-Aorange text-white px-8 py-1">
-                Proceed to Checkout
-              </button>
+                <button className="btn btn-md bg-Aorange text-white px-8 py-1">
+                  Proceed to Checkout
+                </button>
               </Link>
             </div>
           </div>

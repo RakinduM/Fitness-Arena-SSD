@@ -8,7 +8,7 @@ import axios from "axios";
 const Cards = ({ item }) => {
   const [isHeartFilled, setIsHeartFilled] = useState(false);
   const [cartItems, setCartItems] = useState([]);
-  const {user} = useContext(AuthContext)
+  const { user } = useContext(AuthContext);
 
   // Function to extract file name from photoURL
   const extractFileName = (image) => {
@@ -31,8 +31,15 @@ const Cards = ({ item }) => {
         position: "center",
         icon: "error",
         title: "Item already in cart",
-        showConfirmButton: false,
-        timer: 1500,
+        text: "This item is already in your cart. You can update the quantity from the cart page.",
+        showConfirmButton: true,
+        confirmButtonText: "Go to Cart",
+        showCancelButton: true,
+        cancelButtonText: "OK",
+      }).then((result) => {
+        if (result.isConfirmed) {
+          window.location.href = "/cart-page";
+        }
       });
     } else {
       const cartItem = {
@@ -51,20 +58,57 @@ const Cards = ({ item }) => {
               position: "center",
               icon: "success",
               title: "Item added to cart",
-              showConfirmButton: false,
-              timer: 1500,
+              text: `${item.name} has been successfully added to your cart!`,
+              showConfirmButton: true,
+              confirmButtonText: "Continue Shopping",
+              showCancelButton: true,
+              cancelButtonText: "View Cart",
+              timer: 4000,
+            }).then((result) => {
+              if (result.dismiss === Swal.DismissReason.cancel) {
+                window.location.href = "/cart-page";
+              }
             });
           }
         })
         .catch((error) => {
+          console.error("Cart error:", error);
+          let errorMessage = "Failed to add to cart";
+          let errorDetails = "";
+
+          // Handle validation errors from backend
+          if (error.response && error.response.status === 400) {
+            const errorData = error.response.data;
+            if (errorData.errors && Array.isArray(errorData.errors)) {
+              errorDetails = errorData.errors
+                .map((err) => `${err.path}: ${err.msg}`)
+                .join(", ");
+            } else if (errorData.message) {
+              errorDetails = errorData.message;
+            } else {
+              errorDetails = "Please check your input and try again";
+            }
+          } else if (error.response && error.response.status >= 500) {
+            errorDetails = "Server error. Please try again later.";
+          } else if (
+            error.response &&
+            error.response.data &&
+            error.response.data.message
+          ) {
+            errorDetails = error.response.data.message;
+          } else {
+            errorDetails = "Please check your connection and try again";
+          }
+
           // Display error SweetAlert
           Swal.fire({
             position: "center",
             icon: "error",
-            title: "Failed to add to cart",
-            text: error.response.data.message,
-            showConfirmButton: false,
-            timer: 1500,
+            title: errorMessage,
+            text: errorDetails,
+            showConfirmButton: true,
+            confirmButtonText: "Try Again",
+            timer: 5000,
           });
         });
     }
