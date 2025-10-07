@@ -3,7 +3,7 @@ import { validationResult } from "express-validator";
 import validator from "validator";
 import mongoSanitize from "mongo-sanitize";
 
-// Controller function to create a new cart item
+// Create a new cart item (linked to logged-in user)
 export const createCartItem = async (req, res) => {
   // Check validation errors
   const errors = validationResult(req);
@@ -15,18 +15,14 @@ export const createCartItem = async (req, res) => {
   }
 
   try {
-    // Sanitize the entire request body
-    const sanitizedBody = mongoSanitize(req.body);
-    const { menuItemId, quantity, email } = sanitizedBody;
+    const { menuItemId, quantity } = req.body;
 
-    // Whitelist and sanitize input data
-    const sanitizedData = {
-      menuItemId: String(menuItemId),
-      quantity: parseInt(quantity),
-      email: validator.normalizeEmail(String(email)),
-    };
+    const newCartItem = new Carts({
+      menuItemId,
+      quantity,
+      userId: req.user._id, // secure
+    });
 
-    const newCartItem = new Carts(sanitizedData);
     const savedCartItem = await newCartItem.save();
     res.status(201).json(savedCartItem);
   } catch (error) {
@@ -35,69 +31,30 @@ export const createCartItem = async (req, res) => {
   }
 };
 
-// Controller function to get carts by email
-export const getCartsByEmail = async (req, res) => {
-  // Sanitize parameters
-  const sanitizedParams = mongoSanitize(req.params);
-  const { email } = sanitizedParams;
-
-  // Validate email parameter
-  if (!validator.isEmail(String(email))) {
-    return res.status(400).json({ error: "Invalid email format" });
-  }
-
+// Get carts of logged-in user
+export const getMyCarts = async (req, res) => {
   try {
-    const normalizedEmail = validator.normalizeEmail(String(email));
-    // Whitelist query fields - only allow email
-    const query = { email: normalizedEmail };
-    const carts = await Carts.find(query).populate("menuItemId");
+    const carts = await Carts.find({ userId: req.user._id }).populate("menuItemId");
     res.json(carts);
   } catch (error) {
-    console.error("Error getting carts by email:", error);
-    res.status(500).json({ error: "Error getting carts by email" });
+    console.error("Error getting user carts:", error);
+    res.status(500).json({ error: "Error getting user carts" });
   }
 };
 
-// Controller function to retrieve all cart items
-export const getAllCartItems = async (req, res) => {
-  try {
-    const cartItems = await Carts.find().populate("menuItemId");
-    res.json(cartItems);
-  } catch (error) {
-    console.error("Error reading cart items:", error);
-    res.status(500).json({ error: "Error reading cart items" });
-  }
-};
-
-// Controller function to get a cart item by its ID
+// Get cart item by ID (only if belongs to user)
 export const getCartItemById = async (req, res) => {
   const itemId = req.params.id;
   try {
-    const cartItem = await Carts.findById(itemId).populate("menuItemId");
-    if (!cartItem) {
-      res.status(404).json({ error: "Cart item not found" });
-      return;
-    }
-    res.json(cartItem);
-  } catch (error) {
-    console.error("Error getting cart item:", error);
-    res.status(500).json({ error: "Error getting cart item" });
-  }
-};
+    const cartItem = await Carts.findOne({
+      _id: itemId,
+      userId: req.user._id, // ownership check
+    }).populate("menuItemId");
 
-// Controller function to get a cart item by menuItemId
-export const getCartByMenuItemId = async (req, res) => {
-  // Sanitize parameters
-  const sanitizedParams = mongoSanitize(req.params);
-  const menuItemId = String(sanitizedParams.id);
-
-  try {
-    // Whitelist query fields - only allow menuItemId
-    const query = { menuItemId: menuItemId };
-    const cartItem = await Carts.findOne(query);
     if (!cartItem) {
       return res.status(404).json({ error: "Cart item not found" });
     }
+
     res.json(cartItem);
   } catch (error) {
     console.error("Error getting cart item:", error);
@@ -105,44 +62,20 @@ export const getCartByMenuItemId = async (req, res) => {
   }
 };
 
-// Controller function to update a cart item by its ID
+// Update cart item (only if belongs to user)
 export const updateCartItemById = async (req, res) => {
-  // Check validation errors
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({
-      message: "Validation failed",
-      errors: errors.array(),
-    });
-  }
-
-  // Sanitize parameters and body
-  const itemId = mongoSanitize(req.params.id);
-  const sanitizedBody = mongoSanitize(req.body);
-
+  const itemId = req.params.id;
   try {
-    // Whitelist and sanitize input data
-    const sanitizedData = {};
-    if (sanitizedBody.menuItemId)
-      sanitizedData.menuItemId = String(sanitizedBody.menuItemId);
-    if (sanitizedBody.quantity)
-      sanitizedData.quantity = parseInt(sanitizedBody.quantity);
-    if (sanitizedBody.email)
-      sanitizedData.email = validator.normalizeEmail(
-        String(sanitizedBody.email)
-      );
-
-    const result = await Carts.findByIdAndUpdate(
-      String(itemId),
-      sanitizedData,
-      {
-        new: true,
-      }
+    const result = await Carts.findOneAndUpdate(
+      { _id: itemId, userId: req.user._id }, // secure
+      req.body,
+      { new: true }
     );
+
     if (!result) {
-      res.status(404).json({ error: "Cart item not found" });
-      return;
+      return res.status(404).json({ error: "Cart item not found" });
     }
+
     res.json(result);
   } catch (error) {
     console.error("Error updating cart item:", error);
@@ -150,15 +83,19 @@ export const updateCartItemById = async (req, res) => {
   }
 };
 
-// Controller function to delete a cart item by its ID
+// Delete cart item (only if belongs to user)
 export const deleteCartItemById = async (req, res) => {
   const cartItemId = req.params.id;
   try {
-    const result = await Carts.findByIdAndDelete(cartItemId);
+    const result = await Carts.findOneAndDelete({
+      _id: cartItemId,
+      userId: req.user._id, // secure
+    });
+
     if (!result) {
-      res.status(404).json({ error: "Cart item not found" });
-      return;
+      return res.status(404).json({ error: "Cart item not found" });
     }
+
     res.json(result);
   } catch (error) {
     console.error("Error deleting cart item:", error);

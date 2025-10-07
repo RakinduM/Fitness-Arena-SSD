@@ -1,30 +1,19 @@
 import express from "express";
 import {
   createCartItem,
-  getCartsByEmail,
-  getCartByMenuItemId,
-  getAllCartItems,
+  getMyCarts,
   getCartItemById,
   updateCartItemById,
   deleteCartItemById,
 } from "../controllers/cartController.js";
-import {
-  validateCart,
-  validateCartUpdate,
-  validateObjectId,
-  validateEmail,
-} from "../Middleware/validationMiddleware.js";
+//import { protect } from "../Middleware/requireAuth.js";
 
 const router = express.Router();
 
-// Routes for cart items
-router.post("/", validateCart, createCartItem); // Create a new cart item
-
-router.get("/", getAllCartItems); // Get all cart items
-router.get("/item/:id", validateObjectId, getCartItemById); // Get a cart item by ID
-router.get("/email/:email", validateEmail, getCartsByEmail);
-router.get("/menu/:id", validateObjectId, getCartByMenuItemId); // Get a cart item by menuItemId
-router.put("/:id", validateObjectId, validateCartUpdate, updateCartItemById); // Update a cart item by ID
-router.delete("/:id", validateObjectId, deleteCartItemById); // Delete a cart item by ID
+//router.post("/", protect, createCartItem);
+//router.get("/", protect, getMyCarts);
+//router.get("/:id", protect, getCartItemById);
+//router.put("/:id", protect, updateCartItemById);
+//router.delete("/:id", protect, deleteCartItemById);
 
 export default router;

@@ -4,45 +4,34 @@ import * as Yup from "yup";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import axios from "axios";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Layout from "../components/Layout/Layout";
 import { useAuthContext } from "../hooks/useAuthContext";
-import Swal from "sweetalert2";  // Import SweetAlert2
+import Swal from "sweetalert2";
 
 const AppForm = () => {
-  const [userId, setUserId] = useState();
   const { user } = useAuthContext();
+  const navigate = useNavigate();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Redirect if not authenticated
   useEffect(() => {
-    const fetchUserId = async () => {
-      try {
-        const response = await fetch(
-          `http://localhost:6005/api/users/${user.email}`,
-          {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${user.token}`,
-            },
-          }
-        );
-        const data = await response.json();
-        setUserId(data._id);
-      } catch (error) {
-        console.error("Error fetching user:", error);
-        setError("An error occurred while fetching user data.");
-      }
-    };
-
-    if (user) {
-      fetchUserId();
+    if (!user || !user.token) {
+      Swal.fire({
+        icon: "warning",
+        title: "Authentication Required",
+        text: "Please log in to book an appointment",
+      }).then(() => {
+        navigate("/login");
+      });
     }
-  }, [user]); // Added user dependency to avoid warnings
+  }, [user, navigate]);
 
   const initialValues = {
     firstname: "",
     lastname: "",
     trainername: "",
-    email: "",
+    email: user?.email || "", // Pre-fill with user's email if available
     phone: "",
     date: new Date(),
     time: "",
@@ -50,76 +39,110 @@ const AppForm = () => {
 
   const validationSchema = Yup.object().shape({
     firstname: Yup.string()
-      .matches(/^[a-zA-Z]+$/, "Only letters are allowed")
+      .matches(/^[a-zA-Z\s]+$/, "Only letters and spaces are allowed")
+      .min(2, "First name must be at least 2 characters")
+      .max(50, "First name cannot exceed 50 characters")
       .required("First Name is required"),
     lastname: Yup.string()
-      .matches(/^[a-zA-Z]+$/, "Only letters are allowed")
+      .matches(/^[a-zA-Z\s]+$/, "Only letters and spaces are allowed")
+      .min(2, "Last name must be at least 2 characters")
+      .max(50, "Last name cannot exceed 50 characters")
       .required("Last Name is required"),
-    trainername: Yup.string().required("Trainer's Name is required"),
-    email: Yup.string().email("Invalid email").required("Email is required"),
-    phone: Yup.string().required("Contact Number is required"),
-    date: Yup.date().required("Date is required"),
+    trainername: Yup.string()
+      .min(2, "Trainer name must be at least 2 characters")
+      .max(100, "Trainer name cannot exceed 100 characters")
+      .required("Trainer's Name is required"),
+    email: Yup.string()
+      .email("Invalid email format")
+      .required("Email is required"),
+    phone: Yup.string()
+      .matches(/^[0-9+\-\s()]+$/, "Invalid phone number format")
+      .min(10, "Phone number must be at least 10 digits")
+      .required("Contact Number is required"),
+    date: Yup.date()
+      .min(new Date(), "Date cannot be in the past")
+      .required("Date is required"),
     time: Yup.string().required("Time is required"),
   });
 
-  const handleSubmit = async (values, { setSubmitting }) => {
+  const handleSubmit = async (values, { resetForm }) => {
+    if (!user || !user.token) {
+      Swal.fire({
+        icon: "error",
+        title: "Authentication Error",
+        text: "You must be logged in to book an appointment",
+      });
+      navigate("/login");
+      return;
+    }
+
+    setIsSubmitting(true);
     try {
+      // Format date properly
       const formattedDate = `${values.date.getFullYear()}-${(
         values.date.getMonth() + 1
       )
         .toString()
-        .padStart(2, "0")}-${values.date
-        .getDate()
-        .toString()
-        .padStart(2, "0")}`;
+        .padStart(2, "0")}-${values.date.getDate().toString().padStart(2, "0")}`;
 
       const appointment = {
-        ...values,
+        firstname: values.firstname.trim(),
+        lastname: values.lastname.trim(),
+        trainername: values.trainername.trim(),
+        email: values.email.trim(),
+        phone: values.phone.trim(),
         date: formattedDate,
-        time: values.time.toString(),
+        time: values.time,
       };
 
+      // ✅ Send request with proper Authorization header
       const response = await axios.post(
         "http://localhost:6005/appointmentsbook/",
-        appointment
-      );
-      const appointmentId = response.data._id;
-
-      // Show success SweetAlert
-      Swal.fire({
-        icon: "success",
-        title: "Appointment booked successfully",
-        showConfirmButton: false,
-        timer: 1500,
-      });
-
-      // Update the user's trainerApp field
-      await axios.put(
-        `http://localhost:6005/api/users/${userId}`,
-        {
-          trainerApp: appointmentId,
-        },
+        appointment,
         {
           headers: {
             Authorization: `Bearer ${user.token}`,
+            "Content-Type": "application/json",
           },
         }
       );
 
-      // Redirect to the appointment view page
-      setTimeout(() => {
-        window.location.href = `/viewtrainer/${appointmentId}`;
-      }, 1600);
+      await Swal.fire({
+        icon: "success",
+        title: "Appointment Booked Successfully!",
+        text: `Appointment ID: ${response.data._id}`,
+        showConfirmButton: true,
+        confirmButtonText: "View Appointment",
+      });
+
+      // Reset form after successful submission
+      resetForm();
+      
+      // Navigate to the specific appointment view
+      navigate(`/viewtrainer/${response.data._id}`);
+      
     } catch (error) {
       console.error("Error booking appointment:", error);
-      // Show error SweetAlert
+      
+      let errorMessage = "Failed to book appointment";
+      if (error.response?.status === 401) {
+        errorMessage = "Your session has expired. Please log in again.";
+        // Optionally logout user
+        navigate("/login");
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
       Swal.fire({
         icon: "error",
-        title: "Failed to book appointment",
-        text: `Error: ${error.message}`,
+        title: "Booking Failed",
+        text: errorMessage,
       });
+    } finally {
+      setIsSubmitting(false);
     }
-    setSubmitting(false);
   };
 
   const handleKeyPress = (event) => {
@@ -129,6 +152,23 @@ const AppForm = () => {
     }
   };
 
+  // Don't render form if user is not authenticated
+  if (!user || !user.token) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center">
+            <h2 className="mb-4 text-2xl font-bold">Authentication Required</h2>
+            <p className="mb-4">Please log in to book an appointment</p>
+            <Link to="/login" className="px-4 py-2 text-white bg-blue-500 rounded hover:bg-blue-600">
+              Login
+            </Link>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
       <div className="flex items-center justify-center h-full AppForm">
@@ -136,169 +176,156 @@ const AppForm = () => {
           initialValues={initialValues}
           validationSchema={validationSchema}
           onSubmit={handleSubmit}
+          enableReinitialize={true}
         >
-          {({ isSubmitting }) => (
-            <Form className="w-full max-w-lg p-6">
-              <h1 className="mb-6 text-3xl font-bold text-center text-black">
-                Booking an appointment
+          {({ setFieldValue, values, errors, touched }) => (
+            <Form className="w-full max-w-lg p-6 bg-white rounded-lg shadow-md">
+              <h1 className="mb-6 text-3xl font-bold text-center text-gray-800">
+                Book an Appointment
               </h1>
-              {/* Input fields */}
-              <div className="flex gap-3">
-                <div className="mb-4">
-                  <label htmlFor="firstname" className="block mb-1">
-                    First Name:
-                  </label>
-                  <Field
-                    type="text"
-                    id="firstname"
-                    name="firstname"
-                    className="w-full px-4 py-2 border rounded-md focus:outline-none focus:border-blue-500"
-                    placeholder="First Name"
-                    onKeyPress={handleKeyPress}
-                    pattern="[A-Za-z]*"
-                    title="Only letters are allowed"
-                  />
-                  <ErrorMessage
-                    name="firstname"
-                    component="div"
-                    className="text-red-500"
-                  />
-                </div>
-                <div className="mb-4">
-                  <label htmlFor="lastname" className="block mb-1">
-                    Last Name:
-                  </label>
-                  <Field
-                    type="text"
-                    id="lastname"
-                    name="lastname"
-                    className="w-full px-4 py-2 border rounded-md focus:outline-none focus:border-blue-500"
-                    placeholder="Last Name"
-                    onKeyPress={handleKeyPress}
-                    pattern="[A-Za-z]*"
-                    title="Only letters are allowed"
-                  />
-                  <ErrorMessage
-                    name="lastname"
-                    component="div"
-                    className="text-red-500"
-                  />
-                </div>
-              </div>
 
               <div className="flex gap-3">
-                <div className="mb-4">
-                  <label htmlFor="email" className="block mb-1">
-                    Email:
-                  </label>
+                <div className="flex-1 mb-4">
+                  <label className="block mb-1 font-semibold">First Name:</label>
                   <Field
-                    type="email"
-                    id="email"
-                    name="email"
-                    className="w-full px-4 py-2 border rounded-md focus:outline-none focus:border-blue-500"
-                    placeholder="Email"
+                    type="text"
+                    name="firstname"
+                    className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      errors.firstname && touched.firstname ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="First Name"
+                    onKeyPress={handleKeyPress}
                   />
                   <ErrorMessage
-                    name="email"
+                    name="firstname"
                     component="div"
-                    className="text-red-500"
+                    className="mt-1 text-sm text-red-500"
                   />
                 </div>
-                <div className="mb-4">
-                  <label htmlFor="phone" className="block mb-1">
-                    Contact Number:
-                  </label>
+                <div className="flex-1 mb-4">
+                  <label className="block mb-1 font-semibold">Last Name:</label>
                   <Field
-                    type="tel"
-                    id="phone"
-                    name="phone"
-                    className="w-full px-4 py-2 border rounded-md focus:outline-none focus:border-blue-500"
-                    placeholder="Contact Number"
+                    type="text"
+                    name="lastname"
+                    className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      errors.lastname && touched.lastname ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="Last Name"
+                    onKeyPress={handleKeyPress}
                   />
                   <ErrorMessage
-                    name="phone"
+                    name="lastname"
                     component="div"
-                    className="text-red-500"
+                    className="mt-1 text-sm text-red-500"
                   />
                 </div>
               </div>
 
               <div className="mb-4">
-                <label htmlFor="trainername" className="block mb-1">
-                  Trainer's Name:
-                </label>
+                <label className="block mb-1 font-semibold">Trainer's Name:</label>
                 <Field
                   type="text"
-                  id="trainername"
                   name="trainername"
-                  className="w-full px-4 py-2 border rounded-md focus:outline-none focus:border-blue-500"
+                  className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    errors.trainername && touched.trainername ? 'border-red-500' : 'border-gray-300'
+                  }`}
                   placeholder="Trainer's Name"
                   onKeyPress={handleKeyPress}
                 />
                 <ErrorMessage
                   name="trainername"
                   component="div"
-                  className="text-red-500"
+                  className="mt-1 text-sm text-red-500"
                 />
               </div>
 
-              <div className="flex justify-between gap-3">
-                {/* Date picker */}
-                <div className="mb-4">
-                  <label htmlFor="date" className="block mb-1">
-                    Date:
-                  </label>
-                  <Field name="date">
-                    {({ field }) => (
-                      <DatePicker
-                        {...field}
-                        selected={field.value}
-                        minDate={new Date()}
-                        dateFormat="yyyy-MM-dd"
-                        className="w-full px-4 py-2 border rounded-md focus:outline-none focus:border-blue-500"
-                        id="date"
-                      />
-                    )}
-                  </Field>
+              <div className="flex gap-3">
+                <div className="flex-1 mb-4">
+                  <label className="block mb-1 font-semibold">Email:</label>
+                  <Field
+                    type="email"
+                    name="email"
+                    className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      errors.email && touched.email ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="Email"
+                  />
                   <ErrorMessage
-                    name="date"
+                    name="email"
                     component="div"
-                    className="text-red-500"
+                    className="mt-1 text-sm text-red-500"
                   />
                 </div>
-                {/* Time input */}
-                <div className="mb-4">
-                  <label htmlFor="time" className="block mb-1">
-                    Time:
-                  </label>
+                <div className="flex-1 mb-4">
+                  <label className="block mb-1 font-semibold">Contact Number:</label>
                   <Field
-                    type="time"
-                    id="time"
-                    name="time"
-                    className="w-full px-4 py-2 border rounded-md focus:outline-none focus:border-blue-500"
+                    type="tel"
+                    name="phone"
+                    className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      errors.phone && touched.phone ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                    placeholder="Contact Number"
                   />
                   <ErrorMessage
-                    name="time"
+                    name="phone"
                     component="div"
-                    className="text-red-500"
+                    className="mt-1 text-sm text-red-500"
                   />
                 </div>
               </div>
 
-              {/* Confirm button */}
+              <div className="flex gap-3">
+                <div className="flex-1 mb-4">
+                  <label className="block mb-1 font-semibold">Date:</label>
+                  <DatePicker
+                    selected={values.date}
+                    onChange={(date) => setFieldValue("date", date)}
+                    minDate={new Date()}
+                    dateFormat="yyyy-MM-dd"
+                    className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      errors.date && touched.date ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                  />
+                  <ErrorMessage
+                    name="date"
+                    component="div"
+                    className="mt-1 text-sm text-red-500"
+                  />
+                </div>
+                <div className="flex-1 mb-4">
+                  <label className="block mb-1 font-semibold">Time:</label>
+                  <Field
+                    type="time"
+                    name="time"
+                    className={`w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      errors.time && touched.time ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                  />
+                  <ErrorMessage
+                    name="time"
+                    component="div"
+                    className="mt-1 text-sm text-red-500"
+                  />
+                </div>
+              </div>
+
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full px-4 py-2 text-white bg-blue-500 rounded-md hover:bg-blue-600 focus:outline-none focus:ring focus:ring-blue-300"
+                className={`w-full px-4 py-2 text-white rounded transition-colors ${
+                  isSubmitting 
+                    ? 'bg-gray-400 cursor-not-allowed' 
+                    : 'bg-blue-500 hover:bg-blue-600 focus:bg-blue-700'
+                }`}
               >
-                Book Appointment
+                {isSubmitting ? "Booking..." : "Book Appointment"}
               </button>
-              {/* Link back to appointment page */}
+
               <Link
-                to="/viewappointment"
+                to="/viewtrainer"
                 className="block mt-4 text-center text-blue-500 hover:underline"
               >
-                View Appointments
+                View My Appointments
               </Link>
             </Form>
           )}

@@ -1,17 +1,33 @@
-import multer, { diskStorage } from 'multer';
+import multer from 'multer';
+import path from 'path';
 
+// Allowed image types
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = /jpeg|jpg|png|gif/;
+  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+  const mimetype = allowedTypes.test(file.mimetype);
 
-// Set storage engine
-const storage = diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, 'public/images/'); // Specify the directory where files will be uploaded
-    },
-    filename: function (req, file, cb) {
-        cb(null, Date.now() + '-' + file.originalname); // Specify the file naming scheme
-    }
+  if (extname && mimetype) {
+    cb(null, true); // Accept file
+  } else {
+    cb(new Error('Only image files are allowed!')); // Reject file
+  }
+};
+
+// Storage configuration
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'public/images/');
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + path.extname(file.originalname)); // safe filename
+  }
 });
 
-// Initialize upload
-const upload = multer({ storage: storage });
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 2 * 1024 * 1024 }, // Max 2MB
+  fileFilter: fileFilter
+});
 
-export default upload; // Export the 'upload' middleware as the default export
+export default upload;
