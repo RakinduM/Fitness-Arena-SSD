@@ -58,11 +58,18 @@ import ViewOffer from "./components/ViewOffer";
 import PkgManager from "./pages/PkgManager.jsx";
 
 function App() {
-  const { user } = useAuthContext();
+  const { user, loading } = useAuthContext();
+
+  console.log("Current user:", user);
+
+  // Show loading spinner while checking auth status
+  if (loading) {
+    return <div>Loading...</div>;
+  }
 
   // Define a function to check if the user has the admin role
   const isAdmin = user && user.role === "admin";
-  const isUser = user && user.role === "user";
+  const isUser = user && (user.role === "user" || user.role === "customer");
   const isPkg = user && user.role === "pkgManager";
 
   return (
