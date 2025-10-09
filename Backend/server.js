@@ -34,8 +34,17 @@ const app = express();
 //const server = createServer(app); // Create an HTTP server instance
 //const io = new Server(server); // Create a new instance of the Socket.IO server
 
+app.use(cors({
+  origin: "http://localhost:5173", // Update to your frontend port
+  credentials: true
+}));
 // Helmet sets security headers, including X-Content-Type-Options: nosniff
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: false, // Allow cross-origin image loading
+  })
+);
+
 app.use(
   helmet.contentSecurityPolicy({
     useDefaults: true,
@@ -51,10 +60,7 @@ app.use(
 );
 //middleware
 app.use(express.json());
-app.use(cors({
-  origin: "http://localhost:5173", // Update to your frontend port
-  credentials: true
-}));
+
 app.use(express.static("public"));
 
 //session middleware
